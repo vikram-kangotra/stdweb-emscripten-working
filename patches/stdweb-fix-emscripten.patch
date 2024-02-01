@@ -1,0 +1,67 @@
+diff --git a/src/webcore/ffi/emscripten.rs b/src/webcore/ffi/emscripten.rs
+index 005abc4..e2089a7 100644
+--- a/src/webcore/ffi/emscripten.rs
++++ b/src/webcore/ffi/emscripten.rs
+@@ -18,6 +18,7 @@ pub unsafe fn dealloc( ptr: *mut u8, _: usize ) {
+ 
+ pub mod exports {
+     extern "C" {
++        /// This function is used to run js code.
+         pub fn emscripten_asm_const_int( code: *const u8, ... ) -> i32;
+     }
+ }
+diff --git a/stdweb-internal-macros/src/js_shim.rs b/stdweb-internal-macros/src/js_shim.rs
+index 263ed4a..1727e8c 100644
+--- a/stdweb-internal-macros/src/js_shim.rs
++++ b/stdweb-internal-macros/src/js_shim.rs
+@@ -13,7 +13,8 @@ use utils::{Target, dummy_idents};
+ struct Snippet {
+     name: String,
+     code: String,
+-    arg_count: usize
++    arg_count: usize,
++    has_return: bool,
+ }
+ 
+ fn hash( string: &str ) -> String {
+@@ -54,7 +55,8 @@ pub fn js_shim_extern_code( target: Target, code: &str, arg_count: usize, return
+     let snippet = Snippet {
+         name: format!( "__cargo_web_snippet_{}", hash( code ) ),
+         code: code.to_owned(),
+-        arg_count
++        arg_count,
++        has_return: return_ty.is_some(),
+     };
+ 
+     let has_return_value = return_ty.is_some();
+@@ -68,29 +70,7 @@ pub fn js_shim_extern_code( target: Target, code: &str, arg_count: usize, return
+     let shim_args: Vec< _ > = dummy_idents( arg_count ).map( |name| quote! { #name: *const u8 } ).collect();
+     let shim_args_passthrough: Vec< _ > = dummy_idents( arg_count ).map( |name| quote! { #name } ).collect();
+     let output = match target {
+-        Target::Emscripten => {
+-            let code_bytes = syn::LitByteStr::new( format!( "{}\0", code ).as_str().as_bytes(), Span::call_site() );
+-            let return_semicolon = if has_return_value {
+-                quote! {}
+-            } else {
+-                quote! { ; }
+-            };
+-
+-            quote! {
+-                const SNIPPET: &'static [u8] = #code_bytes;
+-
+-                fn #shim_name( #(#shim_args),* ) #return_signature {
+-                    extern "C" {
+-                        pub fn emscripten_asm_const_int( code: *const u8, ... ) -> i32;
+-                    }
+-
+-                    unsafe {
+-                        emscripten_asm_const_int( SNIPPET as *const _ as *const u8, #(#shim_args_passthrough),* ) #return_semicolon
+-                    }
+-                }
+-            }
+-        },
+-        Target::NativeWebAssembly => {
++        Target::Emscripten | Target::NativeWebAssembly => {
+             output_snippet( &snippet );
+             quote! {
+                 extern "C" {

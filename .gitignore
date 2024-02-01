@@ -1,0 +1,6 @@
+/target
+libstdweb_emscripten_working.a
+main.js 
+main.wasm 
+snippet.c
+.patch_applied
