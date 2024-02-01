@@ -11,6 +11,12 @@ All the instructions are in the `Makefile`.
 git clone https://github.com/vikram-kangotra/stdweb-emscripten-working.git --recursive
 ```
 
+### Prerequisite
+
+```
+cargo install cargo-web
+```
+
 ### How to run
 
 ```
